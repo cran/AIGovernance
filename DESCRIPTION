@@ -1,15 +1,15 @@
 Package: AIGovernance
 Type: Package
-Title: Statistical Auditing and Governance Reporting for Employment AI
-        Systems
-Version: 0.1.0
+Title: Statistical Auditing, Drift Monitoring and Governance Reporting
+        for AI Decision Systems
+Version: 0.2.0
 Authors@R: person("Subir", "Hait",
     email = "haitsubi@msu.edu",
     role  = c("aut", "cre"),
     comment = c(ORCID = "0009-0004-9871-9677"))
 Description: Provides statistical auditing, risk documentation, and reporting
-    tools to support AI governance workflows for employment and hiring decision
-    systems. Implements the EEOC four-fifths adverse impact rule
+    tools to support AI governance workflows for employment, hiring and other
+    AI-assisted decision systems. Implements the EEOC four-fifths adverse impact rule
     (Equal Employment Opportunity Commission, 1978,
     <https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XIV/part-1607>),
     NYC Local Law 144 bias audit requirements (New York City, 2023,
@@ -18,23 +18,32 @@ Description: Provides statistical auditing, risk documentation, and reporting
     Institute of Standards and Technology
     (2023, <doi:10.6028/NIST.AI.100-1>). Optionally supports EU AI Act
     high-risk classification (European Parliament and Council, 2024,
-    <https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R1689>).
-    The package does not provide legal advice or certify legal compliance; it
-    is a statistical and documentation support tool.
+    <https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai>).
+    It also audits decision drift over time: the change in a
+    decision rate is decomposed into case-mix, allocation (routing of cases to
+    decision units) and rule-change components in the spirit of Kitagawa
+    (1955) <doi:10.1080/01621459.1955.10501299>; net and absolute drift are
+    estimated over a fixed reference case mix with overlap trimming and
+    cluster bootstrap uncertainty; categorical decisions and unit-level drift
+    with noise-corrected heterogeneity are supported; and a simulator with
+    known drift mechanisms is included. The package does not provide legal
+    advice or certify legal compliance; it is a statistical and documentation
+    support tool.
 License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.3.3
 Depends: R (>= 4.1.0)
-Imports: cli, rlang, stats, tibble, dplyr
+Imports: cli, rlang, stats, utils, tibble, dplyr, nnet
 Suggests: ggplot2, knitr, rmarkdown, testthat (>= 3.0.0)
 VignetteBuilder: knitr
 Language: en-US
-URL: https://github.com/causalfragility-lab/AIGovernance
-BugReports: https://github.com/causalfragility-lab/AIGovernance/issues
+Config/testthat/edition: 3
+URL: https://github.com/subirhait/AIGovernance
+BugReports: https://github.com/subirhait/AIGovernance/issues
 NeedsCompilation: no
-Packaged: 2026-05-19 14:37:57 UTC; Subir
+Packaged: 2026-11-11 23:01:57 UTC; subir
 Author: Subir Hait [aut, cre] (ORCID: <https://orcid.org/0009-0004-9871-9677>)
 Maintainer: Subir Hait <haitsubi@msu.edu>
+Config/roxygen2/version: 8.1.1
 Repository: CRAN
-Date/Publication: 2026-05-27 09:50:07 UTC
+Date/Publication: 2026-11-12 14:50:34 UTC

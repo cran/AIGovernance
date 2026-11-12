@@ -221,8 +221,8 @@ aigov_checklist <- function(gov, framework) {
     ),
 
     EU_AI_Act = tibble::tibble(
-      item_id       = paste0("EU_", c(9,10,11,13,14,15,43,49)),
-      function_area = paste0("Art. ", c(9,10,11,13,14,15,43,49)),
+      item_id       = paste0("EU_", c(9,10,11,13,14,15,43,49,72)),
+      function_area = paste0("Art. ", c(9,10,11,13,14,15,43,49,72)),
       description   = c(
         "Art. 9  \u2014 Risk management system is established and maintained",
         "Art. 10 \u2014 Training data governance and bias examination completed",
@@ -231,7 +231,8 @@ aigov_checklist <- function(gov, framework) {
         "Art. 14 \u2014 Human oversight measures are implemented",
         "Art. 15 \u2014 Accuracy, robustness, and cybersecurity requirements met",
         "Art. 43 \u2014 Conformity assessment completed (self-assessment or notified body)",
-        "Art. 49 \u2014 System registered in EU AI database"
+        "Art. 49 \u2014 System registered in EU AI database",
+        "Art. 72 \u2014 Post-market monitoring system is established and documented"
       )
     )
   )
@@ -240,6 +241,7 @@ aigov_checklist <- function(gov, framework) {
   nist_done <- gov$results$nist_rmf$checklist
   ai_done   <- !is.null(gov$results$adverse_impact)
   nyc_done  <- !is.null(gov$results$nyc_ll144)
+  drift_done <- !is.null(gov$results$drift) || !is.null(gov$results$monitor)
 
   cl$status <- vapply(seq_len(nrow(cl)), function(i) {
     id <- cl$item_id[i]
@@ -255,6 +257,11 @@ aigov_checklist <- function(gov, framework) {
     # NYC LL144 items auto-derived from nyc audit run
     if (framework == "NYC_LL144") {
       if (nyc_done && id %in% c("LL144_1", "LL144_3")) return("Complete")
+    }
+    # EU Art. 72: a drift audit is evidence for, not proof of, a
+    # post-market monitoring system
+    if (framework == "EU_AI_Act") {
+      if (drift_done && id == "EU_72") return("Evidence available")
     }
     "Pending"
   }, character(1))

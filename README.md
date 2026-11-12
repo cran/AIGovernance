@@ -1,8 +1,8 @@
 # AIGovernance
 
-**Statistical Auditing and Governance Reporting for Employment AI Systems**
+**Statistical Auditing, Drift Monitoring and Governance Reporting for AI Decision Systems**
 
-[![R-CMD-check](https://github.com/causalfragility-lab/AIGovernance/workflows/R-CMD-check/badge.svg)](https://github.com/causalfragility-lab/AIGovernance/actions)
+[![R-CMD-check](https://github.com/subirhait/AIGovernance/workflows/R-CMD-check/badge.svg)](https://github.com/subirhait/AIGovernance/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![R >= 4.1.0](https://img.shields.io/badge/R-%3E%3D%204.1.0-blue)](https://cran.r-project.org/)
 
@@ -14,18 +14,26 @@
 
 ## Motivation
 
-Organisations deploying AI systems in employment decisions face growing
-regulatory requirements — from the **EEOC 4/5ths adverse impact rule** to
-**NYC Local Law 144** (mandatory annual bias audits for AEDTs) to the
-**EU AI Act** (High Risk classification for employment AI). Yet no
-dedicated R package provides a unified statistical workflow for these
-governance tasks.
+Organisations deploying AI systems in employment and public decisions face
+growing regulatory requirements — from the **EEOC 4/5ths adverse impact
+rule** to **NYC Local Law 144** (mandatory annual bias audits for AEDTs) to
+the **EU AI Act** (High Risk classification for employment AI) and federal
+requirements for ongoing monitoring of high-impact AI uses.
 
-`AIGovernance` fills this gap as a focused MVP for the employment domain.
+Existing R fairness packages (for example `fairmodels` and `fairness`)
+measure disparities at a single point in time. Regulatory audits such as the
+4/5ths rule and the LL144 impact ratio are also single-period comparisons.
+They cannot tell whether a change in selection rates comes from a different
+applicant pool or from a change in how comparable applicants are decided.
+
+`AIGovernance` combines regulatory-format reporting with auditing of
+**decision drift over time**: case mix versus allocation versus rule change,
+net versus masked (offsetting) drift, and unit-level drift across recruiters,
+offices or courts.
 
 ---
 
-## Frameworks Covered (v0.1.0)
+## Frameworks Covered
 
 | Framework | Jurisdiction | Coverage |
 |---|---|---|
@@ -40,9 +48,9 @@ governance tasks.
 
 ```r
 # From GitHub (development version)
-remotes::install_github("causalfragility-lab/AIGovernance")
+remotes::install_github("subirhait/AIGovernance")
 
-# From CRAN (once accepted)
+# From CRAN
 install.packages("AIGovernance")
 ```
 
@@ -90,6 +98,33 @@ gov <- aigov_classify(gov, domain = "employment",
 aigov_report(gov, format = "html")
 ```
 
+### Decision drift (v0.2.0)
+
+```r
+data(hiring_panel)   # 3 periods, 24 recruiters, reject / review / advance
+
+gov <- aigov_build(hiring_panel, selected, group, ref_group = "A")
+
+# case mix vs allocation vs rule change; net vs masked drift; unit drift
+gov <- aigov_drift(gov, period = period,
+                   covariates = c("qualification", "degree"),
+                   unit = recruiter, baseline = 2024, current = 2026,
+                   B = 200, seed = 1)
+
+# categorical decision
+gov <- aigov_drift(gov, period = period,
+                   covariates = c("qualification", "degree"),
+                   decision = decision, focal = "advance", B = 200, seed = 1)
+
+# every period against the baseline, Holm-adjusted
+gov <- aigov_monitor(gov, period = period,
+                     covariates = c("qualification", "degree"), B = 200)
+
+# simulate known mechanisms for method evaluation
+sim <- aigov_simulate_drift(n = 2000, scenario = "offsetting_cases", seed = 1)
+attr(sim, "truth")$drift
+```
+
 ---
 
 ## Core Functions
@@ -104,6 +139,9 @@ aigov_report(gov, format = "html")
 | `aigov_classify()` | EU AI Act risk tier + NIST risk tier |
 | `aigov_checklist()` | Display checklist items for any framework |
 | `aigov_report()` | Generate HTML audit report |
+| `aigov_drift()` | Decision drift: case mix / allocation / rule change, net and absolute drift, unit drift |
+| `aigov_monitor()` | Drift across several periods with multiplicity adjustment |
+| `aigov_simulate_drift()` | Simulate decisions under known drift mechanisms |
 
 ---
 
@@ -113,15 +151,14 @@ aigov_report(gov, format = "html")
 
 | Package | Role |
 |---|---|
-| [`decisionpaths`](https://github.com/causalfragility-lab/decisionpaths) | Longitudinal decision path construction |
-| [`DecisionDrift`](https://github.com/causalfragility-lab/DecisionDrift) | Temporal drift detection in repeated AI decisions |
-| [`AIBias`](https://github.com/causalfragility-lab/AIBias) | Longitudinal bias amplification analysis |
+| [`decisionpaths`](https://github.com/subirhait/decisionpaths) | Longitudinal decision path construction |
+| [`DecisionDrift`](https://github.com/subirhait/DecisionDrift) | Temporal drift detection in repeated AI decisions |
+| [`AIBias`](https://github.com/subirhait/AIBias) | Longitudinal bias amplification analysis |
 
 ---
 
-## Planned for v0.2.0
+## Planned
 
-- `aigov_monitor()` — threshold-based drift alerts
 - `aigov_remediate()` — actionable remediation suggestions
 - Colorado AI Act (SB 205) module
 - Illinois AI Video Interview Act module
@@ -139,6 +176,8 @@ aigov_report(gov, format = "html")
   <https://doi.org/10.6028/NIST.AI.100-1>
 - European Parliament and Council (2024). Regulation (EU) 2024/1689
   (EU AI Act). <https://digital-strategy.ec.europa.eu/en/policies/regulatory-framework-ai>
+- Kitagawa, E. M. (1955). Components of a difference between two rates.
+  *Journal of the American Statistical Association*, 50(272), 1168–1194.
 
 ---
 
@@ -146,12 +185,12 @@ aigov_report(gov, format = "html")
 
 ```bibtex
 @Manual{Hait2026AIGovernance,
-  title  = {AIGovernance: Statistical Auditing and Governance Reporting
-             for Employment AI Systems},
+  title  = {AIGovernance: Statistical Auditing, Drift Monitoring and
+             Governance Reporting for AI Decision Systems},
   author = {Hait, Subir},
   year   = {2026},
-  note   = {R package version 0.1.0},
-  url    = {https://github.com/causalfragility-lab/AIGovernance}
+  note   = {R package version 0.2.0},
+  url    = {https://github.com/subirhait/AIGovernance}
 }
 ```
 

@@ -11,7 +11,13 @@ aigov_audit_nist(gov, responses = list())
 
 \item{responses}{An optional named list of logical values (\code{TRUE}/
 \code{FALSE}) for checklist items. Use \code{aigov_checklist(gov,
-"NIST_RMF")} to see item names. Items not supplied default to \code{NA}.}
+"NIST_RMF")} to see item names. Items not supplied default to \code{NA}.
+Some items are filled automatically from modules already run:
+\code{MEASURE_1_2} after \code{\link{aigov_adverse_impact}}, and
+\code{MEASURE_3_1} after \code{\link{aigov_drift}} or
+\code{\link{aigov_monitor}}. A value you supply always takes precedence.
+\code{MANAGE_4_1} (periodic review of monitoring results) requires a
+human review and is never set automatically.}
 }
 \value{
 The input \code{gov} object with \code{gov$results$nist_rmf}

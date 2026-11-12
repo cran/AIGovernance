@@ -83,7 +83,8 @@ aigov_classify <- function(gov,
       "Art. 14 \u2014 Human oversight measures",
       "Art. 15 \u2014 Accuracy, robustness, and cybersecurity",
       "Art. 43 \u2014 Conformity assessment",
-      "Art. 49 \u2014 Registration in EU AI database"
+      "Art. 49 \u2014 Registration in EU AI database",
+      "Art. 72 \u2014 Post-market monitoring system (providers)"
     )
   } else {
     c("Art. 50 \u2014 Transparency obligations (if applicable)")

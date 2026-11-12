@@ -66,7 +66,7 @@ aigov_audit_nyc <- function(gov, use_most_selected = TRUE) {
       selection_rate = .data$n_selected / .data$n,
       .groups       = "drop"
     ) %>%
-    dplyr::rename(category = .data$.grp)
+    dplyr::rename(category = ".grp")
 
   # --- reference category ----------------------------------------------------
   if (use_most_selected) {

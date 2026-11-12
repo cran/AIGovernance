@@ -14,6 +14,12 @@
 #' @param responses An optional named list of logical values (\code{TRUE}/
 #'   \code{FALSE}) for checklist items. Use \code{aigov_checklist(gov,
 #'   "NIST_RMF")} to see item names. Items not supplied default to \code{NA}.
+#'   Some items are filled automatically from modules already run:
+#'   \code{MEASURE_1_2} after \code{\link{aigov_adverse_impact}}, and
+#'   \code{MEASURE_3_1} after \code{\link{aigov_drift}} or
+#'   \code{\link{aigov_monitor}}. A value you supply always takes precedence.
+#'   \code{MANAGE_4_1} (periodic review of monitoring results) requires a
+#'   human review and is never set automatically.
 #'
 #' @return The input \code{gov} object with \code{gov$results$nist_rmf}
 #'   appended, containing:
@@ -90,6 +96,13 @@ aigov_audit_nist <- function(gov, responses = list()) {
   # If adverse impact already run, mark MEASURE_1_2 = TRUE
   if (!is.null(gov$results$adverse_impact)) {
     if (is.null(responses$MEASURE_1_2)) responses$MEASURE_1_2 <- TRUE
+  }
+  # If a drift audit or multi-period monitoring has been run, mark
+  # MEASURE_3_1 (ongoing monitoring for bias drift). MANAGE_4_1 (periodic
+  # review of monitoring results) needs a human review and is not set here.
+  drift_done <- !is.null(gov$results$drift) || !is.null(gov$results$monitor)
+  if (drift_done) {
+    if (is.null(responses$MEASURE_3_1)) responses$MEASURE_3_1 <- TRUE
   }
 
   # --- merge user responses --------------------------------------------------

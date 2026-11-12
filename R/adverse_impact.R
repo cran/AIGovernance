@@ -80,7 +80,7 @@ aigov_adverse_impact <- function(gov, min_n = 30L) {
 
   # --- AIR + tests -----------------------------------------------------------
   results <- rates %>%
-    dplyr::rename(group = .data$.grp) %>%
+    dplyr::rename(group = ".grp") %>%
     dplyr::mutate(
       AIR = ifelse(.data$group == ref, 1.0,
                    .data$selection_rate / ref_rate),

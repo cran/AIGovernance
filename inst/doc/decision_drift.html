@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<meta name="author" content="Subir Hait, Michigan State University" />
+
+
+<title>Auditing Decision Drift Over Time</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Auditing Decision Drift Over Time</h1>
+<h4 class="author">Subir Hait, Michigan State University</h4>
+
+
+
+<blockquote>
+<p><strong>Disclaimer:</strong> <code>AIGovernance</code> is a
+statistical and documentation support tool. It does not provide legal
+advice or certify compliance.</p>
+</blockquote>
+<div id="why-a-single-period-audit-is-not-enough" class="section level2">
+<h2>Why a single-period audit is not enough</h2>
+<p>An employer that selects 60% of applicants in two successive years
+may look stable. The stable rate can hide a rule that became more
+lenient for some applicants and stricter for others. A falling rate may
+come from a weaker applicant pool while the rule stays the same. Or the
+rate may change because cases are routed to different recruiters. The
+four-fifths rule and the NYC Local Law 144 impact ratio compare groups
+within one period, so they cannot separate these explanations.</p>
+<p><code>aigov_drift()</code> compares two periods and reports three
+things:</p>
+<ol style="list-style-type: decimal">
+<li><strong>A decomposition</strong> of the change in each decision rate
+into case mix, allocation of cases to decision units, and within-unit
+rule change.</li>
+<li><strong>Net drift</strong> <span class="math inline">\(\Delta_g\)</span>: the average change in the
+decision rule for comparable cases, over a fixed reference case
+mix.</li>
+<li><strong>Absolute drift</strong> <span class="math inline">\(A_g\)</span>: the average size of the change in
+the rule, so that increases and decreases do not cancel. A large <span class="math inline">\(A_g\)</span> with a small <span class="math inline">\(\Delta_g\)</span> is <strong>masked
+drift</strong>.</li>
+</ol>
+</div>
+<div id="example-data" class="section level2">
+<h2>Example data</h2>
+<p><code>hiring_panel</code> contains 4,500 simulated screening
+decisions by 24 recruiters over three years. It was built with known
+mechanisms: weaker applicant pools, offsetting rule changes for
+applicants with and without a degree, routing of strong applicants to
+lenient recruiters, and a higher bar for “advance”.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(AIGovernance)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">data</span>(hiring_panel)</span>
+<span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">round</span>(<span class="fu">with</span>(hiring_panel, <span class="fu">tapply</span>(selected, <span class="fu">list</span>(group, period), mean)), <span class="dv">3</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" tabindex="-1"></a><span class="co">#&gt;    2024  2025  2026</span></span>
+<span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="co">#&gt; A 0.610 0.531 0.437</span></span>
+<span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="co">#&gt; B 0.559 0.469 0.375</span></span>
+<span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="co">#&gt; C 0.594 0.483 0.417</span></span></code></pre></div>
+<p>Selection fell for every group. The question is why.</p>
+</div>
+<div id="single-period-audits" class="section level2">
+<h2>Single-period audits</h2>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a>gov <span class="ot">&lt;-</span> <span class="fu">aigov_build</span>(hiring_panel[hiring_panel<span class="sc">$</span>period <span class="sc">==</span> <span class="dv">2026</span>, ],</span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a>                   selected, group, <span class="at">ref_group =</span> <span class="st">&quot;A&quot;</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a><span class="co">#&gt; ✔ AIGovernance object built: 1500 records,</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="co">#&gt; ℹ Disclaimer: AIGovernance is a statistical support tool.</span></span>
+<span id="cb2-5"><a href="#cb2-5" tabindex="-1"></a>gov <span class="ot">&lt;-</span> <span class="fu">aigov_adverse_impact</span>(gov)</span>
+<span id="cb2-6"><a href="#cb2-6" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-7"><a href="#cb2-7" tabindex="-1"></a><span class="co">#&gt; ── EEOC Adverse Impact (4/5ths Rule) ──</span></span>
+<span id="cb2-8"><a href="#cb2-8" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb2-9"><a href="#cb2-9" tabindex="-1"></a><span class="co">#&gt; # A tibble: 3 × 8</span></span>
+<span id="cb2-10"><a href="#cb2-10" tabindex="-1"></a><span class="co">#&gt;   group     n n_selected selection_rate   AIR fourfifths_flag p_value</span></span>
+<span id="cb2-11"><a href="#cb2-11" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt; &lt;int&gt;      &lt;int&gt;          &lt;dbl&gt; &lt;dbl&gt; &lt;lgl&gt;             &lt;dbl&gt;</span></span>
+<span id="cb2-12"><a href="#cb2-12" tabindex="-1"></a><span class="co">#&gt; 1 A       749        327          0.437 1     FALSE           NA     </span></span>
+<span id="cb2-13"><a href="#cb2-13" tabindex="-1"></a><span class="co">#&gt; 2 B       437        164          0.375 0.860 FALSE            0.0387</span></span>
+<span id="cb2-14"><a href="#cb2-14" tabindex="-1"></a><span class="co">#&gt; 3 C       314        131          0.417 0.956 FALSE            0.560 </span></span>
+<span id="cb2-15"><a href="#cb2-15" tabindex="-1"></a><span class="co">#&gt; # ℹ 1 more variable: small_n_flag &lt;lgl&gt;</span></span>
+<span id="cb2-16"><a href="#cb2-16" tabindex="-1"></a><span class="co">#&gt; ✔ Result: PASS — No group flagged for adverse impact (AIR &gt;= 0.80 for all groups).</span></span>
+<span id="cb2-17"><a href="#cb2-17" tabindex="-1"></a><span class="co">#&gt; ℹ Disclaimer: The 4/5ths rule is a statistical rule of thumb.</span></span></code></pre></div>
+<p>The impact ratios describe 2026 alone. They say nothing about what
+changed.</p>
+</div>
+<div id="drift-audit" class="section level2">
+<h2>Drift audit</h2>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a>gov <span class="ot">&lt;-</span> <span class="fu">aigov_build</span>(hiring_panel, selected, group, <span class="at">ref_group =</span> <span class="st">&quot;A&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="co">#&gt; ✔ AIGovernance object built: 4500 records,</span></span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a><span class="co">#&gt; ℹ Disclaimer: AIGovernance is a statistical support tool.</span></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>gov <span class="ot">&lt;-</span> <span class="fu">aigov_drift</span>(gov, <span class="at">period =</span> period,</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a>                   <span class="at">covariates =</span> <span class="fu">c</span>(<span class="st">&quot;qualification&quot;</span>, <span class="st">&quot;degree&quot;</span>),</span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a>                   <span class="at">unit =</span> recruiter, <span class="at">baseline =</span> <span class="dv">2024</span>, <span class="at">current =</span> <span class="dv">2026</span>,</span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>                   <span class="at">B =</span> <span class="dv">50</span>, <span class="at">seed =</span> <span class="dv">1</span>)</span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a><span class="co">#&gt; ── Decision Drift Audit ──</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb3-11"><a href="#cb3-11" tabindex="-1"></a><span class="co">#&gt; • Periods : 2024 (baseline) vs 2026 (current)</span></span>
+<span id="cb3-12"><a href="#cb3-12" tabindex="-1"></a><span class="co">#&gt; • Decision : selected [0 / 1], focal = 1</span></span>
+<span id="cb3-13"><a href="#cb3-13" tabindex="-1"></a><span class="co">#&gt; • Covariates : qualification, degree</span></span>
+<span id="cb3-14"><a href="#cb3-14" tabindex="-1"></a><span class="co">#&gt; • Units : recruiter</span></span>
+<span id="cb3-15"><a href="#cb3-15" tabindex="-1"></a><span class="co">#&gt; • Reference Q : pooled; overlap trim = 0.02; tolerance = 0.05</span></span>
+<span id="cb3-16"><a href="#cb3-16" tabindex="-1"></a><span class="co">#&gt; • Analysis n : 3000; bootstrap replicates used = 50</span></span>
+<span id="cb3-17"><a href="#cb3-17" tabindex="-1"></a><span class="co">#&gt; Decomposition of the change in P(D = 1):</span></span>
+<span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a><span class="co">#&gt;    group rate_baseline rate_current raw_change case_mix allocation rule_change</span></span>
+<span id="cb3-19"><a href="#cb3-19" tabindex="-1"></a><span class="co">#&gt;  Overall        0.5907       0.4147    -0.1760  -0.0817    -0.0897     -0.0046</span></span>
+<span id="cb3-20"><a href="#cb3-20" tabindex="-1"></a><span class="co">#&gt;        A        0.6100       0.4366    -0.1734  -0.0763    -0.1034      0.0062</span></span>
+<span id="cb3-21"><a href="#cb3-21" tabindex="-1"></a><span class="co">#&gt;        B        0.5588       0.3753    -0.1835  -0.0862    -0.0726     -0.0247</span></span>
+<span id="cb3-22"><a href="#cb3-22" tabindex="-1"></a><span class="co">#&gt;        C        0.5936       0.4172    -0.1764  -0.0931    -0.0807     -0.0027</span></span>
+<span id="cb3-23"><a href="#cb3-23" tabindex="-1"></a><span class="co">#&gt; Net and absolute drift over the reference case mix:</span></span>
+<span id="cb3-24"><a href="#cb3-24" tabindex="-1"></a><span class="co">#&gt;    group net_drift  net_lo  net_hi abs_drift abs_drift_bc abs_lo</span></span>
+<span id="cb3-25"><a href="#cb3-25" tabindex="-1"></a><span class="co">#&gt;  Overall   -0.0783 -0.1058 -0.0539    0.1468       0.1441 0.1279</span></span>
+<span id="cb3-26"><a href="#cb3-26" tabindex="-1"></a><span class="co">#&gt;        A   -0.0835 -0.1217 -0.0533    0.1496       0.1464 0.1305</span></span>
+<span id="cb3-27"><a href="#cb3-27" tabindex="-1"></a><span class="co">#&gt;        B   -0.0780 -0.1129 -0.0395    0.1476       0.1467 0.1230</span></span>
+<span id="cb3-28"><a href="#cb3-28" tabindex="-1"></a><span class="co">#&gt;        C   -0.0658 -0.1105 -0.0383    0.1387       0.1343 0.1212</span></span>
+<span id="cb3-29"><a href="#cb3-29" tabindex="-1"></a><span class="co">#&gt;              alert</span></span>
+<span id="cb3-30"><a href="#cb3-30" tabindex="-1"></a><span class="co">#&gt;          net drift</span></span>
+<span id="cb3-31"><a href="#cb3-31" tabindex="-1"></a><span class="co">#&gt;          net drift</span></span>
+<span id="cb3-32"><a href="#cb3-32" tabindex="-1"></a><span class="co">#&gt;  conditional drift</span></span>
+<span id="cb3-33"><a href="#cb3-33" tabindex="-1"></a><span class="co">#&gt;  conditional drift</span></span>
+<span id="cb3-34"><a href="#cb3-34" tabindex="-1"></a><span class="co">#&gt; Unit-level drift (24 units):</span></span>
+<span id="cb3-35"><a href="#cb3-35" tabindex="-1"></a><span class="co">#&gt; • Mean unit drift = -0.0405; between-unit SD (noise-corrected) = 0.0226;</span></span>
+<span id="cb3-36"><a href="#cb3-36" tabindex="-1"></a><span class="co">#&gt;   reliability = 0.06</span></span>
+<span id="cb3-37"><a href="#cb3-37" tabindex="-1"></a><span class="co">#&gt; • Mean |shrunken unit drift| = 0.0398; share beyond tolerance = 0</span></span>
+<span id="cb3-38"><a href="#cb3-38" tabindex="-1"></a><span class="co">#&gt; • Units flagged (BH q &lt; 0.05 and |shrunken drift| &gt; tolerance): 0</span></span>
+<span id="cb3-39"><a href="#cb3-39" tabindex="-1"></a><span class="co">#&gt; ✖ Result: REVIEW — drift beyond tolerance detected; examine rule changes, coding, model versions and override practice.</span></span>
+<span id="cb3-40"><a href="#cb3-40" tabindex="-1"></a><span class="co">#&gt; ℹ Drift is conditional on recorded characteristics; it does not identify the causal effect of an AI system.</span></span></code></pre></div>
+<p>Read the output in this order:</p>
+<ul>
+<li><strong>Decomposition.</strong> Selection fell by about 18 points.
+About half of the fall is case mix (weaker applicants) and about half is
+allocation (weaker applicants were routed to stricter recruiters). The
+within-unit rule change is near zero: on average, recruiters did not
+become stricter.</li>
+<li><strong>Drift.</strong> Net drift for comparable applicants is about
+-8 points. This is a change in the <em>system’s</em> treatment of
+comparable cases, and the decomposition shows that it comes from
+routing, not from recruiters. Absolute drift is about twice the net
+drift, so the rule also moved in opposite directions for different
+applicants (by construction, applicants with a degree gained and those
+without lost).</li>
+<li><strong>Units.</strong> The noise-corrected between-unit standard
+deviation is small and no recruiter is flagged, so recruiters changed by
+similar amounts.</li>
+</ul>
+<p>Because the data are simulated, the truth is known:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a>tr <span class="ot">&lt;-</span> <span class="fu">attr</span>(hiring_panel, <span class="st">&quot;truth&quot;</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>tr<span class="sc">$</span>decomposition</span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co">#&gt; # A tibble: 4 × 4</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="co">#&gt;   group   true_case_mix true_allocation true_rule_change</span></span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;           &lt;dbl&gt;           &lt;dbl&gt;            &lt;dbl&gt;</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="co">#&gt; 1 Overall       -0.0935         -0.0726          0.00872</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co">#&gt; 2 A             -0.0876         -0.0829          0.0134 </span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="co">#&gt; 3 B             -0.0978         -0.0592          0.00270</span></span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; 4 C             -0.107          -0.0666          0.00597</span></span>
+<span id="cb4-10"><a href="#cb4-10" tabindex="-1"></a>tr<span class="sc">$</span>drift[, <span class="fu">c</span>(<span class="st">&quot;group&quot;</span>, <span class="st">&quot;true_net_drift&quot;</span>, <span class="st">&quot;true_abs_drift&quot;</span>)]</span>
+<span id="cb4-11"><a href="#cb4-11" tabindex="-1"></a><span class="co">#&gt; # A tibble: 4 × 3</span></span>
+<span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt;   group   true_net_drift true_abs_drift</span></span>
+<span id="cb4-13"><a href="#cb4-13" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;            &lt;dbl&gt;          &lt;dbl&gt;</span></span>
+<span id="cb4-14"><a href="#cb4-14" tabindex="-1"></a><span class="co">#&gt; 1 Overall        -0.0494          0.125</span></span>
+<span id="cb4-15"><a href="#cb4-15" tabindex="-1"></a><span class="co">#&gt; 2 A              -0.0557          0.128</span></span>
+<span id="cb4-16"><a href="#cb4-16" tabindex="-1"></a><span class="co">#&gt; 3 B              -0.0380          0.123</span></span>
+<span id="cb4-17"><a href="#cb4-17" tabindex="-1"></a><span class="co">#&gt; 4 C              -0.0512          0.122</span></span></code></pre></div>
+<p>The estimates are close to the truth. The net drift estimate is about
+two standard errors from its true value of -0.05, which is ordinary
+sampling error at 1,500 cases per period. Repeated simulation with
+<code>aigov_simulate_drift()</code> shows no systematic bias for this
+design.</p>
+</div>
+<div id="categorical-decisions" class="section level2">
+<h2>Categorical decisions</h2>
+<p>The binary outcome <code>selected</code> only records passing the
+first screen. With the three-category decision the audit also sees
+movement between “review” and “advance”.</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>gov <span class="ot">&lt;-</span> <span class="fu">aigov_drift</span>(gov, <span class="at">period =</span> period,</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a>                   <span class="at">covariates =</span> <span class="fu">c</span>(<span class="st">&quot;qualification&quot;</span>, <span class="st">&quot;degree&quot;</span>),</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a>                   <span class="at">decision =</span> decision, <span class="at">focal =</span> <span class="st">&quot;advance&quot;</span>,</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a>                   <span class="at">baseline =</span> <span class="dv">2024</span>, <span class="at">current =</span> <span class="dv">2026</span>, <span class="at">B =</span> <span class="dv">50</span>, <span class="at">seed =</span> <span class="dv">1</span>,</span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>                   <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>d <span class="ot">&lt;-</span> gov<span class="sc">$</span>results<span class="sc">$</span>drift<span class="sc">$</span>decomposition</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>d[d<span class="sc">$</span>group <span class="sc">==</span> <span class="st">&quot;Overall&quot;</span>, <span class="fu">c</span>(<span class="st">&quot;category&quot;</span>, <span class="st">&quot;raw_change&quot;</span>, <span class="st">&quot;case_mix&quot;</span>, <span class="st">&quot;rule_change&quot;</span>, <span class="st">&quot;net_drift&quot;</span>)]</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a><span class="co">#&gt; # A tibble: 3 × 5</span></span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a><span class="co">#&gt;   category raw_change case_mix rule_change net_drift</span></span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;         &lt;dbl&gt;    &lt;dbl&gt;       &lt;dbl&gt;     &lt;dbl&gt;</span></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a><span class="co">#&gt; 1 reject       0.176    0.0804      0.0956    0.0789</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a><span class="co">#&gt; 2 review      -0.0587  -0.0172     -0.0415   -0.0252</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a><span class="co">#&gt; 3 advance     -0.117   -0.0632     -0.0541   -0.0536</span></span></code></pre></div>
+<p>The “reject” rate rose and both “review” and “advance” fell. A binary
+audit of <code>selected</code> would miss the extra movement from
+“advance” to “review” for applicants who still pass the first
+screen.</p>
+</div>
+<div id="monitoring-several-periods" class="section level2">
+<h2>Monitoring several periods</h2>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>gov <span class="ot">&lt;-</span> <span class="fu">aigov_monitor</span>(gov, <span class="at">period =</span> period,</span>
+<span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>                     <span class="at">covariates =</span> <span class="fu">c</span>(<span class="st">&quot;qualification&quot;</span>, <span class="st">&quot;degree&quot;</span>),</span>
+<span id="cb6-3"><a href="#cb6-3" tabindex="-1"></a>                     <span class="at">B =</span> <span class="dv">50</span>, <span class="at">seed =</span> <span class="dv">1</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb6-5"><a href="#cb6-5" tabindex="-1"></a><span class="co">#&gt; ── Decision Drift Monitoring ──</span></span>
+<span id="cb6-6"><a href="#cb6-6" tabindex="-1"></a><span class="co">#&gt; </span></span>
+<span id="cb6-7"><a href="#cb6-7" tabindex="-1"></a><span class="co">#&gt; 2 comparison(s), baseline design; net-drift p-values adjusted by holm.</span></span>
+<span id="cb6-8"><a href="#cb6-8" tabindex="-1"></a><span class="co">#&gt;    comparison   group net_drift net_p_tol_adj abs_drift_bc abs_lo</span></span>
+<span id="cb6-9"><a href="#cb6-9" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2025 Overall   -0.0400        1.0000       0.0860 0.0698</span></span>
+<span id="cb6-10"><a href="#cb6-10" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2025       A   -0.0377        1.0000       0.0873 0.0643</span></span>
+<span id="cb6-11"><a href="#cb6-11" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2025       B   -0.0395        1.0000       0.0850 0.0708</span></span>
+<span id="cb6-12"><a href="#cb6-12" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2025       C   -0.0465        1.0000       0.0840 0.0725</span></span>
+<span id="cb6-13"><a href="#cb6-13" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2026 Overall   -0.0783        0.4408       0.1417 0.1285</span></span>
+<span id="cb6-14"><a href="#cb6-14" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2026       A   -0.0835        0.7278       0.1447 0.1285</span></span>
+<span id="cb6-15"><a href="#cb6-15" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2026       B   -0.0780        0.9158       0.1434 0.1226</span></span>
+<span id="cb6-16"><a href="#cb6-16" tabindex="-1"></a><span class="co">#&gt;  2024 -&gt; 2026       C   -0.0658        1.0000       0.1316 0.1168</span></span>
+<span id="cb6-17"><a href="#cb6-17" tabindex="-1"></a><span class="co">#&gt;          alert_adj units_flagged</span></span>
+<span id="cb6-18"><a href="#cb6-18" tabindex="-1"></a><span class="co">#&gt;       masked drift            NA</span></span>
+<span id="cb6-19"><a href="#cb6-19" tabindex="-1"></a><span class="co">#&gt;       masked drift            NA</span></span>
+<span id="cb6-20"><a href="#cb6-20" tabindex="-1"></a><span class="co">#&gt;       masked drift            NA</span></span>
+<span id="cb6-21"><a href="#cb6-21" tabindex="-1"></a><span class="co">#&gt;       masked drift            NA</span></span>
+<span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a><span class="co">#&gt;  conditional drift            NA</span></span>
+<span id="cb6-23"><a href="#cb6-23" tabindex="-1"></a><span class="co">#&gt;  conditional drift            NA</span></span>
+<span id="cb6-24"><a href="#cb6-24" tabindex="-1"></a><span class="co">#&gt;  conditional drift            NA</span></span>
+<span id="cb6-25"><a href="#cb6-25" tabindex="-1"></a><span class="co">#&gt;  conditional drift            NA</span></span>
+<span id="cb6-26"><a href="#cb6-26" tabindex="-1"></a><span class="co">#&gt; ✖ Result: REVIEW — at least one comparison shows drift beyond tolerance.</span></span></code></pre></div>
+<p>Each later period is compared with the baseline, and net-drift
+p-values are adjusted for the number of comparisons. In 2025 the net
+change is within tolerance but the absolute change is not: this is
+masked drift. By 2026 the absolute change is larger still. The net
+change is near the tolerance, and after adjustment for the number of
+comparisons it is not clearly beyond it, so those rows are reported as
+conditional drift. This is valid for prespecified comparisons. Repeated
+looks at accumulating data need sequential methods.</p>
+</div>
+<div id="evaluating-the-audit-by-simulation" class="section level2">
+<h2>Evaluating the audit by simulation</h2>
+<p><code>aigov_simulate_drift()</code> generates data under known
+mechanisms, so the false-alarm rate and power of any audit can be
+studied. For example, a pure change in case mix should not raise an
+alert:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>sim <span class="ot">&lt;-</span> <span class="fu">aigov_simulate_drift</span>(<span class="at">n =</span> <span class="dv">1500</span>, <span class="at">scenario =</span> <span class="st">&quot;case_mix&quot;</span>, <span class="at">seed =</span> <span class="dv">3</span>)</span>
+<span id="cb7-2"><a href="#cb7-2" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="fu">aigov_build</span>(sim, selected, group, <span class="at">ref_group =</span> <span class="st">&quot;A&quot;</span>)</span>
+<span id="cb7-3"><a href="#cb7-3" tabindex="-1"></a><span class="co">#&gt; ✔ AIGovernance object built: 3000 records,</span></span>
+<span id="cb7-4"><a href="#cb7-4" tabindex="-1"></a><span class="co">#&gt; ℹ Disclaimer: AIGovernance is a statistical support tool.</span></span>
+<span id="cb7-5"><a href="#cb7-5" tabindex="-1"></a>g <span class="ot">&lt;-</span> <span class="fu">aigov_drift</span>(g, <span class="at">period =</span> period, <span class="at">covariates =</span> <span class="fu">c</span>(<span class="st">&quot;qualification&quot;</span>, <span class="st">&quot;degree&quot;</span>),</span>
+<span id="cb7-6"><a href="#cb7-6" tabindex="-1"></a>                 <span class="at">B =</span> <span class="dv">50</span>, <span class="at">seed =</span> <span class="dv">1</span>, <span class="at">verbose =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb7-7"><a href="#cb7-7" tabindex="-1"></a>g<span class="sc">$</span>results<span class="sc">$</span>drift<span class="sc">$</span>drift[, <span class="fu">c</span>(<span class="st">&quot;group&quot;</span>, <span class="st">&quot;net_drift&quot;</span>, <span class="st">&quot;abs_drift_bc&quot;</span>, <span class="st">&quot;alert&quot;</span>)]</span>
+<span id="cb7-8"><a href="#cb7-8" tabindex="-1"></a><span class="co">#&gt; # A tibble: 4 × 4</span></span>
+<span id="cb7-9"><a href="#cb7-9" tabindex="-1"></a><span class="co">#&gt;   group   net_drift abs_drift_bc alert</span></span>
+<span id="cb7-10"><a href="#cb7-10" tabindex="-1"></a><span class="co">#&gt;   &lt;chr&gt;       &lt;dbl&gt;        &lt;dbl&gt; &lt;chr&gt;</span></span>
+<span id="cb7-11"><a href="#cb7-11" tabindex="-1"></a><span class="co">#&gt; 1 Overall   -0.0216       0.0257 none </span></span>
+<span id="cb7-12"><a href="#cb7-12" tabindex="-1"></a><span class="co">#&gt; 2 A         -0.0154       0.0262 none </span></span>
+<span id="cb7-13"><a href="#cb7-13" tabindex="-1"></a><span class="co">#&gt; 3 B         -0.0267       0.0262 none </span></span>
+<span id="cb7-14"><a href="#cb7-14" tabindex="-1"></a><span class="co">#&gt; 4 C         -0.0292       0.0233 none</span></span></code></pre></div>
+</div>
+<div id="what-the-audit-does-not-establish" class="section level2">
+<h2>What the audit does not establish</h2>
+<p>Drift is a change in decisions conditional on the recorded
+characteristics. It does not identify the causal effect of an AI system
+or of human discretion. A change in an unrecorded, decision-relevant
+characteristic appears as drift (scenario <code>&quot;unobserved&quot;</code> in
+the simulator). An alert is a reason to review rule changes, data
+coding, model versions and override practice. It is not a finding of
+harm.</p>
+</div>
+<div id="references" class="section level2">
+<h2>References</h2>
+<p>Kitagawa, E. M. (1955). Components of a difference between two rates.
+<em>Journal of the American Statistical Association</em>, 50(272),
+1168–1194.</p>
+<p>Cai, T. T., Namkoong, H., &amp; Yadlowsky, S. (2023). Diagnosing
+model performance under distribution shift. arXiv:2303.02011.</p>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

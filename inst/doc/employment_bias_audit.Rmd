@@ -22,7 +22,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 `AIGovernance` helps organisations document, audit, and report on the
 fairness and governance properties of employment AI systems — specifically
-Automated Employment Decision Tools (AEDTs). Version 0.1.0 covers three
+Automated Employment Decision Tools (AEDTs). The package covers three
 frameworks:
 
 | Framework | Jurisdiction | Nature |

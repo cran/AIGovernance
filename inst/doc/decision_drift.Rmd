@@ -1,0 +1,166 @@
+---
+title: "Auditing Decision Drift Over Time"
+author: "Subir Hait, Michigan State University"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Auditing Decision Drift Over Time}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+> **Disclaimer:** `AIGovernance` is a statistical and documentation support
+> tool. It does not provide legal advice or certify compliance.
+
+## Why a single-period audit is not enough
+
+An employer that selects 60% of applicants in two successive years may look
+stable. The stable rate can hide a rule that became more lenient for some
+applicants and stricter for others. A falling rate may come from a weaker
+applicant pool while the rule stays the same. Or the rate may change because
+cases are routed to different recruiters. The four-fifths rule and the NYC
+Local Law 144 impact ratio compare groups within one period, so they cannot
+separate these explanations.
+
+`aigov_drift()` compares two periods and reports three things:
+
+1. **A decomposition** of the change in each decision rate into case mix,
+   allocation of cases to decision units, and within-unit rule change.
+2. **Net drift** $\Delta_g$: the average change in the decision rule for
+   comparable cases, over a fixed reference case mix.
+3. **Absolute drift** $A_g$: the average size of the change in the rule,
+   so that increases and decreases do not cancel. A large $A_g$ with a small
+   $\Delta_g$ is **masked drift**.
+
+## Example data
+
+`hiring_panel` contains 4,500 simulated screening decisions by 24 recruiters
+over three years. It was built with known mechanisms: weaker applicant pools,
+offsetting rule changes for applicants with and without a degree, routing of
+strong applicants to lenient recruiters, and a higher bar for "advance".
+
+```{r data}
+library(AIGovernance)
+data(hiring_panel)
+round(with(hiring_panel, tapply(selected, list(group, period), mean)), 3)
+```
+
+Selection fell for every group. The question is why.
+
+## Single-period audits
+
+```{r single}
+gov <- aigov_build(hiring_panel[hiring_panel$period == 2026, ],
+                   selected, group, ref_group = "A")
+gov <- aigov_adverse_impact(gov)
+```
+
+The impact ratios describe 2026 alone. They say nothing about what changed.
+
+## Drift audit
+
+```{r drift}
+gov <- aigov_build(hiring_panel, selected, group, ref_group = "A")
+gov <- aigov_drift(gov, period = period,
+                   covariates = c("qualification", "degree"),
+                   unit = recruiter, baseline = 2024, current = 2026,
+                   B = 50, seed = 1)
+```
+
+Read the output in this order:
+
+* **Decomposition.** Selection fell by about 18 points. About half of the
+  fall is case mix (weaker applicants) and about half is allocation (weaker
+  applicants were routed to stricter recruiters). The within-unit rule change
+  is near zero: on average, recruiters did not become stricter.
+* **Drift.** Net drift for comparable applicants is about -8 points. This is
+  a change in the *system's* treatment of comparable cases, and the
+  decomposition shows that it comes from routing, not from recruiters.
+  Absolute drift is about twice the net drift, so the rule also moved in
+  opposite directions for different applicants (by construction, applicants
+  with a degree gained and those without lost).
+* **Units.** The noise-corrected between-unit standard deviation is small
+  and no recruiter is flagged, so recruiters changed by similar amounts.
+
+Because the data are simulated, the truth is known:
+
+```{r truth}
+tr <- attr(hiring_panel, "truth")
+tr$decomposition
+tr$drift[, c("group", "true_net_drift", "true_abs_drift")]
+```
+
+The estimates are close to the truth. The net drift estimate is about two
+standard errors from its true value of -0.05, which is ordinary sampling
+error at 1,500 cases per period. Repeated simulation with
+`aigov_simulate_drift()` shows no systematic bias for this design.
+
+## Categorical decisions
+
+The binary outcome `selected` only records passing the first screen. With
+the three-category decision the audit also sees movement between "review"
+and "advance".
+
+```{r categorical}
+gov <- aigov_drift(gov, period = period,
+                   covariates = c("qualification", "degree"),
+                   decision = decision, focal = "advance",
+                   baseline = 2024, current = 2026, B = 50, seed = 1,
+                   verbose = FALSE)
+d <- gov$results$drift$decomposition
+d[d$group == "Overall", c("category", "raw_change", "case_mix", "rule_change", "net_drift")]
+```
+
+The "reject" rate rose and both "review" and "advance" fell. A binary
+audit of `selected` would miss the extra movement from "advance" to
+"review" for applicants who still pass the first screen.
+
+## Monitoring several periods
+
+```{r monitor}
+gov <- aigov_monitor(gov, period = period,
+                     covariates = c("qualification", "degree"),
+                     B = 50, seed = 1)
+```
+
+Each later period is compared with the baseline, and net-drift p-values are
+adjusted for the number of comparisons. In 2025 the net change is within
+tolerance but the absolute change is not: this is masked drift. By 2026 the
+absolute change is larger still. The net change is near the tolerance, and
+after adjustment for the number of comparisons it is not clearly beyond it,
+so those rows are reported as conditional drift. This is valid for prespecified
+comparisons. Repeated looks at accumulating data need sequential methods.
+
+## Evaluating the audit by simulation
+
+`aigov_simulate_drift()` generates data under known mechanisms, so the
+false-alarm rate and power of any audit can be studied. For example, a pure
+change in case mix should not raise an alert:
+
+```{r sim}
+sim <- aigov_simulate_drift(n = 1500, scenario = "case_mix", seed = 3)
+g <- aigov_build(sim, selected, group, ref_group = "A")
+g <- aigov_drift(g, period = period, covariates = c("qualification", "degree"),
+                 B = 50, seed = 1, verbose = FALSE)
+g$results$drift$drift[, c("group", "net_drift", "abs_drift_bc", "alert")]
+```
+
+## What the audit does not establish
+
+Drift is a change in decisions conditional on the recorded characteristics.
+It does not identify the causal effect of an AI system or of human
+discretion. A change in an unrecorded, decision-relevant characteristic
+appears as drift (scenario `"unobserved"` in the simulator). An alert is a
+reason to review rule changes, data coding, model versions and override
+practice. It is not a finding of harm.
+
+## References
+
+Kitagawa, E. M. (1955). Components of a difference between two rates.
+*Journal of the American Statistical Association*, 50(272), 1168--1194.
+
+Cai, T. T., Namkoong, H., & Yadlowsky, S. (2023). Diagnosing model
+performance under distribution shift. arXiv:2303.02011.

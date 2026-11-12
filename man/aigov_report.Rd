@@ -29,7 +29,7 @@ documentation, legal review, or public disclosure (e.g., NYC LL144 website
 posting requirement).
 }
 \examples{
-\donttest{
+\dontrun{
 data(hiring_sim)
 gov <- aigov_build(hiring_sim, selected, race_ethnicity, ref_group = "White")
 gov <- aigov_adverse_impact(gov)
